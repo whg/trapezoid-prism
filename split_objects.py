@@ -24,8 +24,19 @@ def shift_indices(line, numbers):
                                 str(bits[2] - numbers['vn'])]))
 
     return ' '.join(result) + '\n'
-    
 
+
+def save_file(path):
+
+    with open(path, 'w') as wf:
+        for wline in line_buffer:
+            if (wline.startswith('f')):
+                wline = shift_indices(wline, numbers)
+            wf.write(wline)
+
+def make_path(args, name):
+    return path.join(args['--output-dir'], name + '.obj')
+            
 with open(args['<filename>']) as f:
     output_filename = None
     line_buffer = []
@@ -35,13 +46,9 @@ with open(args['<filename>']) as f:
         if line.startswith('o'):
 
             if output_filename:
-                file_path = path.join(args['--output-dir'], output_filename + '.obj')
-                with open(file_path, 'w') as wf:
-                    for wline in line_buffer:
-                        if (wline.startswith('f')):
-                            wline = shift_indices(wline, numbers)
-                        wf.write(wline)
-
+                file_path = make_path(args, output_filename)
+                save_file(file_path)
+                
                 numbers['v']+= len([1 for l in line_buffer if l.startswith('v ')])
                 numbers['vn']+= len([1 for l in line_buffer if l.startswith('vn')])
                 line_buffer = []
@@ -52,3 +59,8 @@ with open(args['<filename>']) as f:
         else:
             line_buffer.append(line)
             
+
+    if output_filename:
+        file_path = make_path(args, output_filename)
+        save_file(file_path)
+        
