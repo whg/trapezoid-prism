@@ -16,16 +16,21 @@ function _sendArgToAll(arg) {
 }
 
 function _sendFuncToAll(callback) {
-	var x, y, z, id, col;
+	var x, y, z, ay, col;
 	var colours = [];
-	for (x = 0; x < DIM; x++) {
-		for (y = 0; y < DIM; y++) {
-			id = x + "-" + y;
-			for (z = 0; z < DIM; z++) {
-				outlet(1, "send", id + "-" + z);
-				col = callback(x, y, z)
+	for (z = 0; z < DIM; z++) {
+		for (x = 0; x < DIM; x++) {
+			for (y = 0; y < DIM; y++) {
+				
+				// adjust y so that's in the right order for the device
+				if (x > 1) ay = 3 - y;
+				else ay = y;
+				
+				outlet(1, "send", x + "-" + ay + "-" + z);
+				col = callback(x, ay, z)
 				outlet(0, col);
-				colours.push.apply(colours, col.splice(1, 3));
+				
+				colours.push.apply(colours, col.slice(1, 4));
 			}
 		}
 	}	
@@ -46,6 +51,18 @@ function _sendToDevice(colours) {
 	
 	outlet(2, [STX].concat(colours, [checksum, ETX]));
 }
+
+function msg_int(v) {
+	post("msg_int", v);
+	post();
+}
+
+function single(px, py, pz) {
+	_sendFuncToAll(function(x, y, z) {
+			return color(x == px && y == py && z == pz ? 1 : 0.2);
+	});
+}
+
 
 function anything() {
     var toforward = arrayfromargs(messagename, arguments);
