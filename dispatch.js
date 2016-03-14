@@ -1,5 +1,5 @@
 
-outlets = 2;
+outlets = 3;
 var DIM = 4;
 
 var DIM2 = DIM * DIM;
@@ -16,15 +16,35 @@ function _sendArgToAll(arg) {
 }
 
 function _sendFuncToAll(callback) {
-	for (var x = 0; x < DIM; x++) {
-		for (var y = 0; y < DIM; y++) {
-			var id = x + "-" + y;
-			for (var z = 0; z < DIM; z++) {
+	var x, y, z, id, col;
+	var colours = [];
+	for (x = 0; x < DIM; x++) {
+		for (y = 0; y < DIM; y++) {
+			id = x + "-" + y;
+			for (z = 0; z < DIM; z++) {
 				outlet(1, "send", id + "-" + z);
-				outlet(0, callback(x, y, z));
+				col = callback(x, y, z)
+				outlet(0, col);
+				colours.push.apply(colours, col.splice(1, 3));
 			}
 		}
 	}	
+	
+	_sendToDevice(colours);
+}
+
+function _sendToDevice(colours) {
+	
+	var STX = 23, ETX = 24;
+	
+	var sum = 0;
+	for (var i = 0, l = TOTAL_LIGHTS * 3; i < l; i++) {
+		colours[i] = Math.floor(colours[i] * 255);
+		sum+= colours[i];
+	}
+	var checksum = sum % 255;
+	
+	outlet(2, [STX].concat(colours, [checksum, ETX]));
 }
 
 function anything() {
