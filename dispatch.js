@@ -169,7 +169,7 @@ function Wave() {
 	
 	var buffer = [];
 	for (var i = 0; i < TOTAL_LIGHTS; i++) {
-		buffer.push(["gl_color", 1, 0, 0, 1]);
+		buffer.push(["gl_color", 0, 0, 0, 1]);
 	}
 	
 	this.callback = function(x, y, z) {
@@ -191,14 +191,14 @@ function Wave() {
 //			post(counter);
 //			post();
 		for (var i = 0, l = buffer.length; i < l; i++) {
-			y = i / 4 % 4;
+			y = Math.floor(i / 4) % 4;
 			
 			if (counter <= 1) {
 				var dist = 1;
 				var adjy = y * 0.25;
-				if (adjy < counter*4) {
+//				if (adjy <= counter) {
 					dist = Math.abs(counter - adjy);
-				}
+//				}
 
 				var newcol = color(1-dist); //y == q ? 1 : 0);
 				for (var j = 1; j < 4; j++) {
