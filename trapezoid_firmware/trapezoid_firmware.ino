@@ -30,25 +30,19 @@ class Receiver {
       while (true) {
         if (Serial.available()) {
           incoming = Serial.read();
-          //        Serial.write(dataPosition);
-
+        
           if (incoming == STX && mode != READING) {
             mode = READING;
-//            Serial.write(1);
             continue;
           }
           else if (incoming == ETX) {
-//            Serial.write(23);
-//            Serial.write(dataPosition);
             if (dataPosition == MESSAGE_LENGTH) {
               mode = ENDED;
-//              Serial.write(2);
             }
           }
 
           if (dataPosition >= MESSAGE_LENGTH && mode != ENDED) {
             dataPosition = 0;
-//            Serial.write(7);
             continue;
           }
 
@@ -56,13 +50,7 @@ class Receiver {
             data[dataPosition++] = incoming;
           }
           else if (mode == ENDED) {
-            //          // make sure the data is the right length
-            //          if (dataPosition != MESSAGE_LENGTH) {
-            //            mode = WAITING;
-            //            Serial.write(3);
-            //            break;
-            //          }
-
+           
             // make sure the checksum is correct
             uint16_t sum = 0;
             for (int i = 0; i < DATA_LENGTH; i++) {
@@ -71,11 +59,8 @@ class Receiver {
             uint8_t checksum = sum % 255;
 
             if (data[CHECKSUM_INDEX] != checksum) {
-//              Serial.write(checksum);
               continue;
             }
-
-            // do your thing
 
             uint8_t *ledsPointer = reinterpret_cast<uint8_t*>(&leds[0]);
             for (int i = 0; i < DATA_LENGTH; i++) {
@@ -83,7 +68,6 @@ class Receiver {
             }
             mode = WAITING;
             dataPosition = 0;
-//            Serial.write(5);
             break;
           }
         }
@@ -91,10 +75,6 @@ class Receiver {
     }
 
 };
-
-
-
-
 
 void setup() {
   FastLED.addLeds<TM1809, DATA_PIN, BRG>(leds, NUM_LEDS);
@@ -112,16 +92,7 @@ Receiver receiver;
 void loop() {
 
   //  checkMidiIn();
-
-  //  leds[counter] = CRGB::Green;
-  //  FastLED.show();
-  //  delay(25);
-  //  leds[counter] = 0x0000;
-  //  counter = (counter + 1) % NUM_LEDS;
-  //  leds[0] = CRGB::Green;
-  //  FastLED.show();
-  //Serial.println(counter);
-
+  
   receiver.receive();
 
   FastLED.show();
@@ -143,8 +114,6 @@ void checkMidiIn() {
 
 
   if (Serial.available()) {
-
-
 
     incoming = Serial.read();
     //  leds[0].r = incoming * 2;
