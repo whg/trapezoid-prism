@@ -15,7 +15,6 @@ class Receiver {
     uint8_t dataPosition;
     uint8_t incoming;
 
-
     enum {
       STX = 23,
       ETX = 24,
@@ -77,8 +76,8 @@ class Receiver {
 };
 
 void setup() {
-  FastLED.addLeds<TM1809, DATA_PIN, BRG>(leds, NUM_LEDS);
-
+//  FastLED.addLeds<TM1809, DATA_PIN, BRG>(leds, NUM_LEDS);
+  FastLED.addLeds<WS2812, DATA_PIN, BRG>(leds, NUM_LEDS);
   Serial.begin(115200);
 }
 
