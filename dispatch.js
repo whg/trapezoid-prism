@@ -69,17 +69,29 @@ function anything() {
 	_sendArgToAll(toforward);
 }
 
-var _breathe = new Breathe();
-var _wave = new Wave();
+//var _breathe = new Breathe();
+//var _wave = new Wave();
+
+var animations = {
+	"breathe": new Breathe(),
+	"wave": new Wave(),
+	"colourWheel": new ColourWheel(),
+};
+
+var currentAnimationName = null;
 
 function bang() {
 	
+	if (!(currentAnimationName in animations)) {
+		return;
+	}
+	
 //	colourWheel();
-	
-	//_sendFuncToAll(_breathe.callback);
-	_sendFuncToAll(_wave.callback);
-	
-	_wave.frameCallback(frameCount);
+		
+	var animation = animations[currentAnimationName];
+		
+	_sendFuncToAll(animation.callback);	
+	animation.frameCallback(frameCount);
 	
 	frameCount++;
 }
@@ -114,14 +126,18 @@ function color() {
 	return ["gl_color", r, g, b, 1];	
 }
 
-function colourWheel() {
-	var theta = frameCount * 0.3;
-	theta*= 1 + Math.sin(frameCount*0.01) * 0.1;
+function ColourWheel() {
+	var theta = 0;
 	
-	_sendFuncToAll(function(x, y, z) {
+	this.callback = (function(x, y, z) {
 		//return ["gl_color", x/DIM, y/DIM, z/DIM];
 		return ["gl_color", Math.sin(theta + x)*0.5+0.5, Math.cos(theta*0.3+z)*0.5+0.5, Math.sin(theta*0.1)*0.5+0.5];
 	});
+	
+	this.frameCallback = function(frameCount) {
+		theta = frameCount * 0.3;
+		theta*= 1 + Math.sin(frameCount*0.01) * 0.1;
+	}
 	
 }
 
@@ -152,6 +168,7 @@ function Breathe() {
 		return color.apply(null, colours[colourCounter].concat([v]));
 	};
 
+	this.frameCallback = function(frameNum) {};
 }
 
 
@@ -224,5 +241,16 @@ function Wave() {
 }
 
 function wave() {
-	_wave.go(frameCount);
+	
+	currentAnimationName = messagename;
+	
+	animations[currentAnimationName].go(frameCount);
+}
+
+function breathe() {
+	currentAnimationName = messagename;
+}
+
+function colourWheel() {
+	currentAnimationName = messagename;
 }
