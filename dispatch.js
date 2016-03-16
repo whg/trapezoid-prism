@@ -23,8 +23,8 @@ function _sendFuncToAll(callback) {
 			for (y = 0; y < DIM; y++) {
 				
 				// adjust y so that's in the right order for the device
-				if (x > 1) ay = 3 - y;
-				else ay = y;
+				if (x > 1) ay = y;
+				else ay = 3 - y;
 				
 				outlet(1, "send", x + "-" + ay + "-" + z);
 				col = callback(x, ay, z)
