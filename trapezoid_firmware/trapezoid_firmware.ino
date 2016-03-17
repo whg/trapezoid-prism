@@ -9,6 +9,15 @@
 
 CRGB leds[NUM_LEDS];
 
+#define DEBUG 1
+#define START 1
+#define END 2
+#define OVERRUN 11
+#define CHECKSUMFAIL 12
+#define SUCCESS 3
+
+uint16_t endIndex = 0;
+
 class Receiver {
   public:
     uint8_t data[256];
@@ -29,19 +38,31 @@ class Receiver {
       while (true) {
         if (Serial.available()) {
           incoming = Serial.read();
-        
+
           if (incoming == STX && mode != READING) {
             mode = READING;
+            #ifdef DEBUG
+            Serial.write(START);
+            #endif
             continue;
           }
           else if (incoming == ETX) {
             if (dataPosition == MESSAGE_LENGTH) {
               mode = ENDED;
+              #ifdef DEBUG
+              Serial.write(END);
+              #endif
             }
+            endIndex = dataPosition;
           }
 
+          // reset position if we've overrun
           if (dataPosition >= MESSAGE_LENGTH && mode != ENDED) {
             dataPosition = 0;
+            #ifdef DEBUG
+            Serial.write(OVERRUN);
+            Serial.write(endIndex);
+            #endif
             continue;
           }
 
@@ -58,6 +79,9 @@ class Receiver {
             uint8_t checksum = sum % 255;
 
             if (data[CHECKSUM_INDEX] != checksum) {
+              #ifdef DEBUG
+              Serial.write(CHECKSUMFAIL);
+              #endif
               continue;
             }
 
@@ -67,6 +91,9 @@ class Receiver {
             }
             mode = WAITING;
             dataPosition = 0;
+            #ifdef DEBUG
+            Serial.write(SUCCESS);
+            #endif
             break;
           }
         }

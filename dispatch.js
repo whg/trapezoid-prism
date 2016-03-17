@@ -57,12 +57,15 @@ function msg_int(v) {
 	post();
 }
 
-function single(px, py, pz) {
+function single(px, py, pz, onCol, offCol) {
+	
+	if (onCol === undefined) onCol = 1.0;
+	if (offCol === undefined) offCol = 0.2;
+	
 	_sendFuncToAll(function(x, y, z) {
 			return color(x == px && y == py && z == pz ? 1 : 0.2);
 	});
 }
-
 
 function anything() {
     var toforward = arrayfromargs(messagename, arguments);
@@ -72,26 +75,25 @@ function anything() {
 //var _breathe = new Breathe();
 //var _wave = new Wave();
 
-var animations = {
+var modes = {
 	"breathe": new Breathe(),
 	"wave": new Wave(),
 	"colourWheel": new ColourWheel(),
+	"midi": new MIDI(),
 };
 
-var currentAnimationName = null;
+var currentModeName = null;
 
 function bang() {
 	
-	if (!(currentAnimationName in animations)) {
+	if (modes[currentModeName] === undefined) {
 		return;
 	}
-	
-//	colourWheel();
+			
+	var mode = modes[currentModeName];
 		
-	var animation = animations[currentAnimationName];
-		
-	_sendFuncToAll(animation.callback);	
-	animation.frameCallback(frameCount);
+	_sendFuncToAll(mode.callback);	
+	mode.frameCallback(frameCount);
 	
 	frameCount++;
 }
@@ -136,7 +138,7 @@ function ColourWheel() {
 	
 	this.frameCallback = function(frameCount) {
 		theta = frameCount * 0.3;
-		theta*= 1 + Math.sin(frameCount*0.01) * 0.1;
+		theta+= 1 + Math.sin(frameCount*0.01) * 0.3;
 	}
 	
 }
@@ -201,56 +203,127 @@ function Wave() {
 			buffer[i][1] = 0; buffer[i][2] = 0; buffer[i][3] = 0;
 		}
 		
-		
 		for (var counterId in counters) {
 			
 			var counter = counters[counterId];
-//			post(counter);
-//			post();
-		for (var i = 0, l = buffer.length; i < l; i++) {
-			y = Math.floor(i / 4) % 4;
+			for (var i = 0, l = buffer.length; i < l; i++) {
+				y = Math.floor(i / 4) % 4;
 			
-			if (counter <= 1) {
-				var dist = 1;
-				var adjy = y * 0.25;
-//				if (adjy <= counter) {
+				if (counter <= 1) {
+					var dist = 1;
+					var adjy = y * 0.25;
 					dist = Math.abs(counter - adjy);
-//				}
 
-				var newcol = color(1-dist); //y == q ? 1 : 0);
+	
+					var newcol = color(1-dist); //y == q ? 1 : 0);
+					for (var j = 1; j < 4; j++) {
+						buffer[i][j] += Math.min(newcol[j], 1);
+					}
+				}
+
 				for (var j = 1; j < 4; j++) {
-					buffer[i][j] += Math.min(newcol[j], 1);
+					buffer[i][j] = Math.max(0, buffer[i][j] - 0.1);
 				}
 			}
-			//else {
-			for (var j = 1; j < 4; j++) {
-				buffer[i][j] = Math.max(0, buffer[i][j] - 0.1);
-			}
-			//}
-			
-//			buffer[i] = ["gl_color", 1,0,1,1];
+		
+			counters[counterId]+= 0.1;
 		}
 		
-		counters[counterId]+= 0.1;
-		
-		}
-		
-	//	counter+= 0.1;
 	};
 	
 }
 
+function FrameBuffer() {
+	this.data = [];
+	
+	for (var i = 0; i < TOTAL_LIGHTS; i++) {
+		data.push(["gl_color", 0, 0, 0, 1]);
+	}
+	
+	this.reset = function(otherBuffer) {
+		for (var i = 0; i < TOTAL_LIGHTS; i++) {
+			for (var j = 1; j < 4; j++) {
+				this.data[i][j] = 0;
+			}
+		}
+	};
+	
+	this.add = function(otherBuffer) {
+		for (var i = 0; i < TOTAL_LIGHTS; i++) {
+			for (var j = 1; j < 4; j++) {
+				this.data[i][j] = Math.min(this.data[i][j], otherBuffer[i][j]);
+			}
+		}
+	};
+	
+	this.callback = function(x, y, z) {	
+		return buffer[x * DIM2 + y * DIM + z];
+	};
+	
+}
+
+function MIDI() {
+	var buffer = [];
+	this.modeNames = ["single", "zline", "travel"];
+	this.mode = this.modeNames[1];
+	
+	var travelIndices = Array.apply(null, Array(16)).map(function(e) { return DIM; });
+	
+	for (var i = 0; i < TOTAL_LIGHTS; i++) {
+		buffer.push(["gl_color", 0, 0, 0, 1]);
+	}
+	
+	this.callback = function(x, y, z) {	
+		return buffer[x * DIM2 + y * DIM + z];
+	};
+	
+	this.receive = function(note, velocity) {
+		var col = color(velocity / 127.0);
+		
+		if (this.mode === "single") {
+			// treat note as index and velocity as brightness
+			buffer[note % TOTAL_LIGHTS] = color(velocity / 127.0);
+		}
+		else if (this.mode === "zline") {
+			var n = note % DIM2 * DIM;
+			for (var z = 0; z < DIM; z++) {
+				buffer[n + z] = col;
+			}
+		}
+		else if (this.mode === "travel") {
+			var n = note % DIM2 * DIM;
+			travelIndices = 0;
+		}
+	};
+	
+	this.frameCallback = function(frameNum) {
+		
+	};
+};
+
+function note(pitch, velocity) {
+	currentModeName = "midi";
+	modes["midi"].receive(pitch, velocity);
+}
+
+function midimode(arg) {
+	if (midi.modeNames.indexOf(arg) != -1) {
+		midi.mode = arg;
+	}
+}
+
+
 function wave() {
 	
-	currentAnimationName = messagename;
+	currentModeName = messagename;
 	
-	animations[currentAnimationName].go(frameCount);
+	modes[currentModeName].go(frameCount);
 }
 
 function breathe() {
-	currentAnimationName = messagename;
+	currentModeName = messagename;
 }
 
 function colourWheel() {
-	currentAnimationName = messagename;
+	currentModeName = messagename;
 }
