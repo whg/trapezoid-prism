@@ -265,7 +265,7 @@ function FrameBuffer() {
 function MIDI() {
 	var buffer = [];
 	this.modeNames = ["single", "zline", "travel"];
-	this.mode = this.modeNames[1];
+	this.mode = this.modeNames[2];
 	
 	var travelIndices = Array.apply(null, Array(16)).map(function(e) { return DIM; });
 	
@@ -292,12 +292,26 @@ function MIDI() {
 		}
 		else if (this.mode === "travel") {
 			var n = note % DIM2 * DIM;
-			travelIndices = 0;
+			buffer[n] = color(velocity / 127.0);
 		}
 	};
 	
 	this.frameCallback = function(frameNum) {
 		
+		if (this.mode == "travel" && frameNum % 3 == 0) {
+			var z;
+			for (var x = 0; x < DIM; x++) {
+				for (var y = 0; y < DIM; y++) {
+					z = x * DIM2 + y * DIM;
+					
+					for (var nz = z + 3; nz > z; nz--) {
+						buffer[nz] = buffer[nz-1];
+					}
+					buffer[z] = color(0);
+
+				}
+			}
+		}
 	};
 };
 
