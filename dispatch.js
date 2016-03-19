@@ -77,12 +77,19 @@ function anything() {
 
 var modes = {
 	"breathe": new Breathe(),
-	"wave": new Wave(),
+//	"wave": new Wave(),
 	"colourWheel": new ColourWheel(),
+//	"midi": new MIDI(),
+};
+
+var interactives = {
+	"wave": new Wave(),
 	"midi": new MIDI(),
 };
 
-var currentModeName = null;
+var mainFrameBuffer = new FrameBuffer();
+
+var currentModeName = "breathe";
 
 function bang() {
 	
@@ -92,7 +99,20 @@ function bang() {
 			
 	var mode = modes[currentModeName];
 		
-	_sendFuncToAll(mode.callback);	
+	
+	mainFrameBuffer.reset();
+	mainFrameBuffer.add(mode.buffer);
+		
+//	_sendFuncToAll(mode.callback);	
+
+	for (var key in interactives) {
+		interactive = interactives[key];
+		interactive.frameCallback.call(interactive, frameCount);
+		mainFrameBuffer.add(interactives[key].buffer);
+	}
+	
+	_sendFuncToAll(mainFrameBuffer.callback);
+
 	mode.frameCallback(frameCount);
 	
 	frameCount++;
@@ -121,7 +141,7 @@ function FrameBuffer() {
 	var that = this;
 	
 	for (var i = 0; i < TOTAL_LIGHTS; i++) {
-		this.buffer.push(["gl_color", 0, 0, 0, 1]);
+		this.buffer.push(["gl_color", 0, 0, 0]);
 	}
 	
 	this.reset = function(otherBuffer) {
@@ -135,7 +155,7 @@ function FrameBuffer() {
 	this.add = function(otherBuffer) {
 		for (var i = 0; i < TOTAL_LIGHTS; i++) {
 			for (var j = 1; j < 4; j++) {
-				that.buffer[i][j] = Math.min(1.0, Math.max(this.buffer[i][j], otherBuffer[i][j]));
+				that.buffer[i][j] = Math.min(1.0, Math.max(that.buffer[i][j], otherBuffer[i][j]));
 			}
 		}
 	};
@@ -172,7 +192,7 @@ function ColourWheel() {
 		for (var i = 0; i < TOTAL_LIGHTS; i++) {
 			z = i % 4;
 			x = i / DIM2;
-			that.buffer[i] = color(Math.sin(theta + x)*0.5+0.5, Math.cos(theta*0.3+z)*0.5+0.5, Math.sin(theta*0.1)*0.5+0.5);
+			that.buffer[i] = color(Math.sin(theta + x)*0.5+0.5, Math.cos(theta*0.3+z)*0.5+0.5, Math.sin(theta*0.1)*0.5+0.5, 0.5);
 		}
 		
 		theta = frameCount * 0.3;
@@ -183,6 +203,8 @@ function ColourWheel() {
 
 function Breathe() {
 	
+	extend(this, new FrameBuffer());
+	var that = this;
 	var delta = 0.01;
 	
 	var colours = [
@@ -196,8 +218,9 @@ function Breathe() {
 	
 	var colourArg = colours[0].concat([1]);
 	
-	this.callback = function(x, y, z) {
-		var v = Math.sin(frameCount*0.1) * 0.5 + 0.5;
+
+	this.frameCallback = function(frameNum) {
+		var v = Math.sin(frameNum*0.1) * 0.5 + 0.5;
 		if (v < delta && canChange) {
 			canChange = false;
 			colourCounter = (colourCounter + 1) % colours.length;
@@ -205,14 +228,18 @@ function Breathe() {
 		if (v > 0.5 && !canChange) {
 			canChange = true;
 		}
-		return color.apply(null, colours[colourCounter].concat([v]));
-	};
+		for (var i = 0; i < TOTAL_LIGHTS; i++) {
+			that.buffer[i] = color.apply(null, colours[colourCounter].concat([v]));
+		}
 
-	this.frameCallback = function(frameNum) {};
+	};
 }
 
 
 function Wave() {
+	
+	extend(this, new FrameBuffer);
+	var that = this;
 	
 	var play = false;
 //	var counter = 0;
@@ -224,27 +251,26 @@ function Wave() {
 		counters[frameNum] = 0;
 	};
 	
-	var buffer = [];
 	for (var i = 0; i < TOTAL_LIGHTS; i++) {
-		buffer.push(["gl_color", 0, 0, 0, 1]);
+		that.buffer.push(["gl_color", 0, 0, 0, 1]);
 	}
 	
 	this.callback = function(x, y, z) {
 		
-		return buffer[x * DIM2 + y * DIM + z];
+		return that.buffer[x * DIM2 + y * DIM + z];
 		
 	};
 	
 	this.frameCallback = function(frameNum) {
 
-		for (var i = 0, l = buffer.length; i < l; i++) {
-			buffer[i][1] = 0; buffer[i][2] = 0; buffer[i][3] = 0;
+		for (var i = 0, l = that.buffer.length; i < l; i++) {
+			that.buffer[i][1] = 0; that.buffer[i][2] = 0; that.buffer[i][3] = 0;
 		}
 		
 		for (var counterId in counters) {
 			
 			var counter = counters[counterId];
-			for (var i = 0, l = buffer.length; i < l; i++) {
+			for (var i = 0, l = that.buffer.length; i < l; i++) {
 				y = Math.floor(i / 4) % 4;
 			
 				if (counter <= 1) {
@@ -255,12 +281,12 @@ function Wave() {
 	
 					var newcol = color(1-dist); //y == q ? 1 : 0);
 					for (var j = 1; j < 4; j++) {
-						buffer[i][j] += Math.min(newcol[j], 1);
+						that.buffer[i][j] += Math.min(newcol[j], 1);
 					}
 				}
 
 				for (var j = 1; j < 4; j++) {
-					buffer[i][j] = Math.max(0, buffer[i][j] - 0.1);
+					that.buffer[i][j] = Math.max(0, that.buffer[i][j] - 0.1);
 				}
 			}
 		
@@ -310,7 +336,7 @@ function MIDI() {
 	
 	this.frameCallback = function(frameNum) {
 		
-		if (this.mode == "travel" && frameNum % 3 == 0) {
+		if (this.mode == "travel" && frameNum % 2 == 0) {
 			var z;
 			for (var x = 0; x < DIM; x++) {
 				for (var y = 0; y < DIM; y++) {
@@ -323,19 +349,23 @@ function MIDI() {
 
 				}
 			}
+
 		}
 	};
 };
 
 function note(pitch, velocity) {
-	currentModeName = "midi";
-	modes["midi"].receive(pitch, velocity);
+//	currentModeName = "midi";
+	interactives["midi"].receive(pitch, velocity);
 }
 
 function midimode(arg) {
+	var midi = interactives["midi"];
 	if (midi.modeNames.indexOf(arg) != -1) {
 		midi.mode = arg;
+		post("set\n");
 	}
+	post(midi.mode);
 }
 
 
