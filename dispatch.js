@@ -86,7 +86,7 @@ var currentModeName = null;
 
 function bang() {
 	
-	if (modes[currentModeName] === undefined) {
+	if (!currentModeName || modes[currentModeName] === undefined) {
 		return;
 	}
 			
@@ -99,44 +99,82 @@ function bang() {
 }
 
 function color() {
+	// always give at least one argument
 	var r = arguments[0], g, b, a;
 	var al = arguments.length;
-	if (al < 3) {
-		g = r;
-		b = r;
-	}
-	else {
-		g = arguments[1];
-		b = arguments[2];
-	}
+
+	if (al < 3) { g = r; b = r; }
+	else { g = arguments[1]; b = arguments[2]; }
+			
+	if (al == 2) a = arguments[1];
+	else if (al == 4) a = arguments[3];
+	else a = 1;
 	
-	if (al == 2) {
-		a = arguments[1];
-	}
-	else if (al == 4) {
-		a = arguments[3];
-	}
-	else {
-		a = 1;
-	}
-	
-	if (a !== 1) {
-		r*= a; g*= a; b*= a;
-	}
-	
+	if (a !== 1) { r*= a; g*= a; b*= a; }
+
 	// emulating LEDs so alpha always 1
-	return ["gl_color", r, g, b, 1];	
+	return ["gl_color", r, g, b];	
 }
 
+function FrameBuffer() {
+	this.buffer = [];
+	var that = this;
+	
+	for (var i = 0; i < TOTAL_LIGHTS; i++) {
+		this.buffer.push(["gl_color", 0, 0, 0, 1]);
+	}
+	
+	this.reset = function(otherBuffer) {
+		for (var i = 0; i < TOTAL_LIGHTS; i++) {
+			for (var j = 1; j < 4; j++) {
+				that.buffer[i][j] = 0;
+			}
+		}
+	};
+	
+	this.add = function(otherBuffer) {
+		for (var i = 0; i < TOTAL_LIGHTS; i++) {
+			for (var j = 1; j < 4; j++) {
+				that.buffer[i][j] = Math.min(1.0, Math.max(this.buffer[i][j], otherBuffer[i][j]));
+			}
+		}
+	};
+	
+	this.callback = function(x, y, z) {	
+		return that.buffer[x * DIM2 + y * DIM + z];
+	};
+	
+}
+
+function extend(subclass, superclass) {
+    for (var key in superclass) {
+        subclass[key] = superclass[key];
+    }
+    return subclass;
+}
+
+
 function ColourWheel() {
+	
+	extend(this, new FrameBuffer());
+	var that = this;
 	var theta = 0;
 	
-	this.callback = (function(x, y, z) {
-		//return ["gl_color", x/DIM, y/DIM, z/DIM];
-		return ["gl_color", Math.sin(theta + x)*0.5+0.5, Math.cos(theta*0.3+z)*0.5+0.5, Math.sin(theta*0.1)*0.5+0.5];
-	});
+//	this.callback = (function(x, y, z) {
+//		return ["gl_color", Math.sin(theta + x)*0.5+0.5, Math.cos(theta*0.3+z)*0.5+0.5, Math.sin(theta*0.1)*0.5+0.5];
+//	});
+
+	
 	
 	this.frameCallback = function(frameCount) {
+		
+		var x, z;
+		for (var i = 0; i < TOTAL_LIGHTS; i++) {
+			z = i % 4;
+			x = i / DIM2;
+			that.buffer[i] = color(Math.sin(theta + x)*0.5+0.5, Math.cos(theta*0.3+z)*0.5+0.5, Math.sin(theta*0.1)*0.5+0.5);
+		}
+		
 		theta = frameCount * 0.3;
 		theta+= 1 + Math.sin(frameCount*0.01) * 0.3;
 	}
@@ -233,48 +271,22 @@ function Wave() {
 	
 }
 
-function FrameBuffer() {
-	this.data = [];
-	
-	for (var i = 0; i < TOTAL_LIGHTS; i++) {
-		data.push(["gl_color", 0, 0, 0, 1]);
-	}
-	
-	this.reset = function(otherBuffer) {
-		for (var i = 0; i < TOTAL_LIGHTS; i++) {
-			for (var j = 1; j < 4; j++) {
-				this.data[i][j] = 0;
-			}
-		}
-	};
-	
-	this.add = function(otherBuffer) {
-		for (var i = 0; i < TOTAL_LIGHTS; i++) {
-			for (var j = 1; j < 4; j++) {
-				this.data[i][j] = Math.min(this.data[i][j], otherBuffer[i][j]);
-			}
-		}
-	};
-	
-	this.callback = function(x, y, z) {	
-		return buffer[x * DIM2 + y * DIM + z];
-	};
-	
-}
-
 function MIDI() {
-	var buffer = [];
+
+	extend(this, new FrameBuffer());
+
 	this.modeNames = ["single", "zline", "travel"];
 	this.mode = this.modeNames[2];
+	var that = this;
 	
 	var travelIndices = Array.apply(null, Array(16)).map(function(e) { return DIM; });
 	
 	for (var i = 0; i < TOTAL_LIGHTS; i++) {
-		buffer.push(["gl_color", 0, 0, 0, 1]);
+		this.buffer.push(["gl_color", 0, 0, 0, 1]);
 	}
 	
 	this.callback = function(x, y, z) {	
-		return buffer[x * DIM2 + y * DIM + z];
+		return that.buffer[x * DIM2 + y * DIM + z];
 	};
 	
 	this.receive = function(note, velocity) {
@@ -282,17 +294,17 @@ function MIDI() {
 		
 		if (this.mode === "single") {
 			// treat note as index and velocity as brightness
-			buffer[note % TOTAL_LIGHTS] = color(velocity / 127.0);
+			that.buffer[note % TOTAL_LIGHTS] = color(velocity / 127.0);
 		}
 		else if (this.mode === "zline") {
 			var n = note % DIM2 * DIM;
 			for (var z = 0; z < DIM; z++) {
-				buffer[n + z] = col;
+				that.buffer[n + z] = col;
 			}
 		}
 		else if (this.mode === "travel") {
 			var n = note % DIM2 * DIM;
-			buffer[n] = color(velocity / 127.0);
+			that.buffer[n] = color(velocity / 127.0);
 		}
 	};
 	
@@ -305,9 +317,9 @@ function MIDI() {
 					z = x * DIM2 + y * DIM;
 					
 					for (var nz = z + 3; nz > z; nz--) {
-						buffer[nz] = buffer[nz-1];
+						that.buffer[nz] = that.buffer[nz-1];
 					}
-					buffer[z] = color(0);
+					that.buffer[z] = color(0);
 
 				}
 			}
