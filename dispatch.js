@@ -76,6 +76,7 @@ function anything() {
 //var _wave = new Wave();
 
 var modes = {
+	"black": new Black(),
 	"breathe": new Breathe(),
 //	"wave": new Wave(),
 	"colourWheel": new ColourWheel(),
@@ -85,35 +86,43 @@ var modes = {
 var interactives = {
 	"wave": new Wave(),
 	"midi": new MIDI(),
+	"mexican": new Mexican(),
 };
 
 var mainFrameBuffer = new FrameBuffer();
 
-var currentModeName = "breathe";
+var currentModeName = "black";
 
 function bang() {
 	
-	if (!currentModeName || modes[currentModeName] === undefined) {
-		return;
-	}
 			
-	var mode = modes[currentModeName];
-		
+	
 	
 	mainFrameBuffer.reset();
-	mainFrameBuffer.add(mode.buffer);
+	
+	if (currentModeName !== null && modes[currentModeName] !== undefined) {
+		var mode = modes[currentModeName];
+		mainFrameBuffer.add(modes[currentModeName].buffer);
+		mode.frameCallback(frameCount);
+	}
+	
 		
 //	_sendFuncToAll(mode.callback);	
 
+	var start = (new Date()).getTime();
+	
+	
 	for (var key in interactives) {
 		interactive = interactives[key];
 		interactive.frameCallback.call(interactive, frameCount);
 		mainFrameBuffer.add(interactives[key].buffer);
 	}
-	
+
 	_sendFuncToAll(mainFrameBuffer.callback);
 
-	mode.frameCallback(frameCount);
+//	post((new Date()).getTime() - start);
+//	post();
+	
 	
 	frameCount++;
 }
@@ -144,13 +153,15 @@ function FrameBuffer() {
 		this.buffer.push(["gl_color", 0, 0, 0]);
 	}
 	
-	this.reset = function(otherBuffer) {
+	this.reset = function() {
 		for (var i = 0; i < TOTAL_LIGHTS; i++) {
 			for (var j = 1; j < 4; j++) {
 				that.buffer[i][j] = 0;
 			}
 		}
 	};
+	
+	this.clear = this.reset;
 	
 	this.add = function(otherBuffer) {
 		for (var i = 0; i < TOTAL_LIGHTS; i++) {
@@ -164,6 +175,8 @@ function FrameBuffer() {
 		return that.buffer[x * DIM2 + y * DIM + z];
 	};
 	
+	this.frameCallback = function(frameNum) {};
+	
 }
 
 function extend(subclass, superclass) {
@@ -173,6 +186,9 @@ function extend(subclass, superclass) {
     return subclass;
 }
 
+function Black() {
+	extend(this, new FrameBuffer());
+}
 
 function ColourWheel() {
 	
@@ -290,26 +306,69 @@ function Wave() {
 				}
 			}
 		
-			counters[counterId]+= 0.1;
+			counters[counterId]+= 0.01;
 		}
 		
 	};
 	
 }
 
+function Mexican() {
+	extend(this, new FrameBuffer());
+
+	var XSTEP_DEFAULT = 5;
+	var xstep = XSTEP_DEFAULT, zstep = 0;
+	var DIMx2 = DIM * 2;
+	
+	this.frameCallback = function(frameCount) {
+		
+		if (xstep > DIMx2+XSTEP_DEFAULT-2) {
+			this.clear();
+			return;
+		}
+		
+		var index;
+		var xpos = 0, zpos = 0;
+		for (var x = 0; x < DIM; x++) {
+			
+			for (var y = 0; y < DIM; y++) {
+				for (var z = 0; z < DIM; z++) {
+					zpos = (z + zstep) % 4;
+					index = x * 16 + y * 4 + z;
+//					xpos = 
+					xpos = (x + xstep + (z + 2)) % DIMx2;
+					if (xpos >= DIM) {
+						xpos = DIMx2 - xpos;
+					}
+					this.buffer[index] = color(y >= ((xpos)%5) ? 0 : 1); 
+				}
+			}
+		}
+ 		
+		if (frameCount % 3 == 0) {
+			xstep++;
+		}
+		if (frameCount % 11 == 0) {
+			zstep++;
+		}
+		//0,1,2,3,2,1
+	};
+	
+	this.go = function() {
+		xstep = XSTEP_DEFAULT+1;
+	};
+}
+
 function MIDI() {
 
 	extend(this, new FrameBuffer());
 
-	this.modeNames = ["single", "zline", "travel"];
+	this.modeNames = ["single", "zline", "yline", "travel"];
 	this.mode = this.modeNames[2];
 	var that = this;
 	
-	var travelIndices = Array.apply(null, Array(16)).map(function(e) { return DIM; });
+	var travelIndices = Array.apply(null, Array(DIM2)).map(function(e) { return DIM; });
 	
-	for (var i = 0; i < TOTAL_LIGHTS; i++) {
-		this.buffer.push(["gl_color", 0, 0, 0, 1]);
-	}
 	
 	this.callback = function(x, y, z) {	
 		return that.buffer[x * DIM2 + y * DIM + z];
@@ -326,6 +385,13 @@ function MIDI() {
 			var n = note % DIM2 * DIM;
 			for (var z = 0; z < DIM; z++) {
 				that.buffer[n + z] = col;
+			}
+		}
+		else if (this.mode === "yline") {
+			var n = note % DIM2;
+			n = n % 4 + n/4*16;
+			for (var y = 0; y < DIM; y++) {
+				that.buffer[n + y] = col;
 			}
 		}
 		else if (this.mode === "travel") {
@@ -355,7 +421,26 @@ function MIDI() {
 };
 
 function note(pitch, velocity) {
-//	currentModeName = "midi";
+	interactives["midi"].receive(pitch, velocity);
+}
+
+function zline(pitch, velocity) {
+	midi.mode = messagename;
+	interactives["midi"].receive(pitch, velocity);
+}
+
+function yline(pitch, velocity) {
+	midi.mode = messagename;
+	interactives["midi"].receive(pitch, velocity);
+}
+
+function dots(pitch, velocity) {
+	midi.mode = messagename;
+	interactives["midi"].receive(pitch, velocity);
+}
+
+function travel(pitch, velocity) {
+	midi.mode = messagename;
 	interactives["midi"].receive(pitch, velocity);
 }
 
@@ -363,17 +448,17 @@ function midimode(arg) {
 	var midi = interactives["midi"];
 	if (midi.modeNames.indexOf(arg) != -1) {
 		midi.mode = arg;
-		post("set\n");
 	}
-	post(midi.mode);
 }
 
 
+
 function wave() {
-	
-	currentModeName = messagename;
-	
-	modes[currentModeName].go(frameCount);
+	interactives["wave"].go.call(interactives["wave"], frameCount);
+}
+
+function none() {
+	currentModeName = null;
 }
 
 function breathe() {
@@ -383,3 +468,16 @@ function breathe() {
 function colourWheel() {
 	currentModeName = messagename;
 }
+
+function black() {
+	currentModeName = messagename;
+}
+
+function _interactiveGo(n) {
+	interactives[n].go.call(interactives[n], frameCount);
+};
+
+function mexican() {
+	_interactiveGo(messagename);
+}
+
