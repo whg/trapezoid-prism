@@ -9,7 +9,7 @@ function tripletIndex(x, y, z) {
 	return x * DIM * DIM + y * DIM + z;
 }
 
-var frameCount = 0;
+var gFrameCount = 0;
 
 function _sendArgToAll(arg) {
 	_sendFuncToAll(function(x, y, z) { return arg; });	
@@ -103,7 +103,7 @@ function bang() {
 	if (currentModeName !== null && modes[currentModeName] !== undefined) {
 		var mode = modes[currentModeName];
 		mainFrameBuffer.add(modes[currentModeName].buffer);
-		mode.frameCallback(frameCount);
+		mode.frameCallback(gFrameCount);
 	}
 	
 		
@@ -114,7 +114,7 @@ function bang() {
 	
 	for (var key in interactives) {
 		interactive = interactives[key];
-		interactive.frameCallback.call(interactive, frameCount);
+		interactive.frameCallback.call(interactive, gFrameCount);
 		mainFrameBuffer.add(interactives[key].buffer);
 	}
 
@@ -124,7 +124,7 @@ function bang() {
 //	post();
 	
 	
-	frameCount++;
+	gFrameCount++;
 }
 
 function color() {
@@ -261,26 +261,22 @@ function Wave() {
 //	var counter = 0;
 	var counters = {};
 	
-	this.go = function(frameNum) {
-		play = true;
-//		counter = 0;
-		counters[frameNum] = 0;
-	};
-	
-	for (var i = 0; i < TOTAL_LIGHTS; i++) {
-		that.buffer.push(["gl_color", 0, 0, 0, 1]);
-	}
-	
-	this.callback = function(x, y, z) {
-		
-		return that.buffer[x * DIM2 + y * DIM + z];
-		
-	};
 	
 	this.frameCallback = function(frameNum) {
 
 		for (var i = 0, l = that.buffer.length; i < l; i++) {
 			that.buffer[i][1] = 0; that.buffer[i][2] = 0; that.buffer[i][3] = 0;
+		}
+		
+		var todelete = [];
+		for (var counterId in counters) {
+			if (counters[counterId] > 1) {
+				todelete.push(counterId);
+			}
+		}
+		
+		for (var i = 0, l = todelete.length; i < l; i++) {
+			delete counters[todelete[i]];
 		}
 		
 		for (var counterId in counters) {
@@ -306,10 +302,18 @@ function Wave() {
 				}
 			}
 		
-			counters[counterId]+= 0.01;
+			counters[counterId]+= 0.1;
 		}
 		
 	};
+	
+	this.go = function(pitch, velocity) {
+		if (velocity > 0) {
+			play = true;
+			counters[gFrameCount] = 0;
+		}
+	};
+	
 	
 }
 
@@ -319,10 +323,11 @@ function Mexican() {
 	var XSTEP_DEFAULT = 5;
 	var xstep = XSTEP_DEFAULT, zstep = 0;
 	var DIMx2 = DIM * 2;
+	var counter = 0;
 	
 	this.frameCallback = function(frameCount) {
 		
-		if (xstep > DIMx2+XSTEP_DEFAULT-2) {
+		if (counter > 9) {
 			this.clear();
 			return;
 		}
@@ -345,8 +350,10 @@ function Mexican() {
 			}
 		}
  		
-		if (frameCount % 3 == 0) {
+		if (frameCount % 2 == 0) {
 			xstep++;
+			
+			counter++;
 		}
 		if (frameCount % 11 == 0) {
 			zstep++;
@@ -354,8 +361,9 @@ function Mexican() {
 		//0,1,2,3,2,1
 	};
 	
-	this.go = function() {
-		xstep = XSTEP_DEFAULT+1;
+	this.go = function(pitch, velocity) {
+	    xstep = XSTEP_DEFAULT+pitch;
+		counter = 0;
 	};
 }
 
@@ -389,9 +397,9 @@ function MIDI() {
 		}
 		else if (this.mode === "yline") {
 			var n = note % DIM2;
-			n = n % 4 + n/4*16;
+			n = n % 4 + Math.floor(n/4)*16;
 			for (var y = 0; y < DIM; y++) {
-				that.buffer[n + y] = col;
+				that.buffer[n + y*4] = col;
 			}
 		}
 		else if (this.mode === "travel") {
@@ -424,25 +432,18 @@ function note(pitch, velocity) {
 	interactives["midi"].receive(pitch, velocity);
 }
 
-function zline(pitch, velocity) {
-	midi.mode = messagename;
+function _midi(_name, pitch, velocity) {
+	interactives["midi"].mode = _name;
 	interactives["midi"].receive(pitch, velocity);
 }
 
-function yline(pitch, velocity) {
-	midi.mode = messagename;
-	interactives["midi"].receive(pitch, velocity);
-}
 
-function dots(pitch, velocity) {
-	midi.mode = messagename;
-	interactives["midi"].receive(pitch, velocity);
-}
+function zline(pitch, vel) { _midi(messagename, pitch, vel); }
+function yline(pitch, vel) { _midi(messagename, pitch, vel); }
+function dots(pitch, vel) { _midi(messagename, pitch, vel); }
+function travel(pitch, vel) { _midi(messagename, pitch, vel); }
 
-function travel(pitch, velocity) {
-	midi.mode = messagename;
-	interactives["midi"].receive(pitch, velocity);
-}
+
 
 function midimode(arg) {
 	var midi = interactives["midi"];
@@ -453,8 +454,8 @@ function midimode(arg) {
 
 
 
-function wave() {
-	interactives["wave"].go.call(interactives["wave"], frameCount);
+function wave(pitch, velocity) {
+	interactives["wave"].go.call(interactives["wave"], pitch, velocity);
 }
 
 function none() {
@@ -473,11 +474,13 @@ function black() {
 	currentModeName = messagename;
 }
 
-function _interactiveGo(n) {
-	interactives[n].go.call(interactives[n], frameCount);
+function _interactiveGo(n, pitch, velocity) {
+	interactives[n].go.call(interactives[n], pitch, velocity);
 };
 
-function mexican() {
-	_interactiveGo(messagename);
+function mexican(pitch, velocity) {
+	if (velocity > 0) {
+		_interactiveGo(messagename, pitch, velocity);
+	}
 }
 
