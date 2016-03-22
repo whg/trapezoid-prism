@@ -39,13 +39,14 @@
 		"boxes" : [ 			{
 				"box" : 				{
 					"id" : "obj-72",
+					"linecount" : 2,
 					"maxclass" : "message",
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 290.0, 591.0, 141.0, 22.0 ],
+					"patching_rect" : [ 290.0, 591.0, 141.0, 35.0 ],
 					"style" : "",
-					"text" : "yline 38 100"
+					"text" : "dots 35 100 0.205128 0.52065 1."
 				}
 
 			}

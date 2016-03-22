@@ -371,23 +371,24 @@ function MIDI() {
 
 	extend(this, new FrameBuffer());
 
-	this.modeNames = ["single", "zline", "yline", "travel"];
+	this.modeNames = ["dots", "zline", "yline", "travel"];
 	this.mode = this.modeNames[2];
 	var that = this;
 	
 	var travelIndices = Array.apply(null, Array(DIM2)).map(function(e) { return DIM; });
-	
+	this.colour = [1, 1, 1];
 	
 	this.callback = function(x, y, z) {	
 		return that.buffer[x * DIM2 + y * DIM + z];
 	};
 	
 	this.receive = function(note, velocity) {
-		var col = color(velocity / 127.0);
-		
-		if (this.mode === "single") {
+
+		var col = color.apply(null, this.colour.concat(velocity / 127.0));
+
+		if (this.mode === "dots") {
 			// treat note as index and velocity as brightness
-			that.buffer[note % TOTAL_LIGHTS] = color(velocity / 127.0);
+			that.buffer[note % TOTAL_LIGHTS] = col;
 		}
 		else if (this.mode === "zline") {
 			var n = note % DIM2 * DIM;
@@ -404,7 +405,7 @@ function MIDI() {
 		}
 		else if (this.mode === "travel") {
 			var n = note % DIM2 * DIM;
-			that.buffer[n] = color(velocity / 127.0);
+			that.buffer[n] = col;
 		}
 	};
 	
@@ -426,22 +427,27 @@ function MIDI() {
 
 		}
 	};
+	
+	this.setColour = function(r, g, b) {
+		this.colour = [r, g, b];
+	};
 };
 
 function note(pitch, velocity) {
 	interactives["midi"].receive(pitch, velocity);
 }
 
-function _midi(_name, pitch, velocity) {
+function _midi(_name, pitch, velocity, r, g, b) {
 	interactives["midi"].mode = _name;
 	interactives["midi"].receive(pitch, velocity);
+	interactives["midi"].setColour.call(interactives["midi"], r, g, b);
 }
 
 
-function zline(pitch, vel) { _midi(messagename, pitch, vel); }
-function yline(pitch, vel) { _midi(messagename, pitch, vel); }
-function dots(pitch, vel) { _midi(messagename, pitch, vel); }
-function travel(pitch, vel) { _midi(messagename, pitch, vel); }
+function zline(pitch, vel, r, g, b) { _midi(messagename, pitch, vel, r, g, b); }
+function yline(pitch, vel, r, g, b) { _midi(messagename, pitch, vel, r, g, b); }
+function dots(pitch, vel, r, g, b) { _midi(messagename, pitch, vel, r, g, b); }
+function travel(pitch, vel, r, g, b) { _midi(messagename, pitch, vel, r, g, b); }
 
 
 
