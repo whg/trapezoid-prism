@@ -87,6 +87,7 @@ var interactives = {
 	"wave": new Wave(),
 	"midi": new MIDI(),
 	"mexican": new Mexican(),
+	"particles": new Particles(),
 };
 
 var mainFrameBuffer = new FrameBuffer();
@@ -226,7 +227,7 @@ function Breathe() {
 			canChange = true;
 		}
 		for (var i = 0; i < TOTAL_LIGHTS; i++) {
-			that.buffer[i] = color.apply(null, colours[colourCounter].concat([v]));
+			this.buffer[i] = color.apply(null, colours[colourCounter].concat([v]));
 		}
 
 	};
@@ -238,7 +239,6 @@ function Wave() {
 	extend(this, new FrameBuffer);
 	
 	var play = false;
-//	var counter = 0;
 	var counters = {};
 	var colour = [1, 1, 1];
 	
@@ -304,7 +304,7 @@ function Mexican() {
 	var XSTEP_DEFAULT = 5;
 	var xstep = XSTEP_DEFAULT, zstep = 0;
 	var DIMx2 = DIM * 2;
-	var counter = 0;
+	var counter = 10;
 	var colour = [1,1,1];
 	
 	this.frameCallback = function(frameCount) {
@@ -328,7 +328,6 @@ function Mexican() {
 						xpos = DIMx2 - xpos;
 					}
 					this.buffer[index] = color.apply(null, y >= ((xpos)%5) ? [0, 0, 0] : colour);
-// 					this.buffer[index] = color.apply(null, (y >= ((xpos)%5) ? [0,0,0] : colour));
 				}
 			}
 		}
@@ -351,20 +350,157 @@ function Mexican() {
 	};
 }
 
+function Vec3(x, y, z) {
+	var dim = 3;
+	this.data = [x, y, z];
+	
+	this.add = function(vector) {
+		for (var i = 0; i < dim; i++) {
+			this.data[i]+= vector.data[i];
+		}
+	};
+	
+	this.sub = function(vector) {
+		for (var i = 0; i < dim; i++) {
+			this.data[i]-= vector.data[i];
+		}
+	};
+	
+	this.mult = function(vector) {
+		for (var i = 0; i < dim; i++) {
+			this.data[i]*= vector.data[i];
+		}
+	};
+	
+	this.dist = function(vector) {
+		var d, sum = 0;
+		for (var i = 0; i < dim; i++) {
+			d = this.data[i] - vector.data[i];
+			sum+= d * d;
+		}
+		return Math.sqrt(sum);
+	};
+	
+	this.length = function() {
+		return this.dist(new Vec3(0, 0, 0));
+	};
+	
+	this.normalise = function() {
+		var l = this.length();
+		for (var i = 0; i < dim; i++) {
+			this.data[i]/= l;
+		}
+	};
+};
+
+function Particle(pos, vel, col) {
+	this.pos = pos;
+	this.vel = vel;
+	this.col = col;
+	
+	this.update = function() {
+		this.pos.add.call(this.pos, this.vel);
+	};
+};
+
+function Particles() {
+	extend(this, new FrameBuffer());
+	
+	var particles = { };//90: new Particle(new Vec3(1, 1, 1), new Vec3(0, 0.1, 0), [1,1,1]) };
+	
+	this.frameCallback = function(frameNum) {
+		this.clear();
+		for (var key in particles) {
+			var particle = particles[key];
+			var x, y, z;
+			for (var n = 0; n < TOTAL_LIGHTS; n++) {
+				x = Math.floor(n / DIM2), y = Math.floor(n / DIM % 4), z = n % DIM;
+				var brightness = 1.0 - particle.pos.dist(new Vec3(x, y, z)) * 0.3;
+				var newcol = color(brightness * particle.col[0], brightness * particle.col[1], brightness * particle.col[2]);
+				for (var c = 0; c < 3; c++) {
+					this.buffer[n][c+1] = Math.min(1.0, this.buffer[n][c+1] + brightness * particle.col[c]);
+				}
+			}
+			
+			
+			particle.update();
+			
+		}
+		post(Object.keys(particles).length);
+		post();
+
+		if (frameNum % 5 == 0) {
+			removeDead();
+		}
+	};
+	
+	function createRandomParticle(pitch, vel) {
+		
+		//create two random numbers and make a 3 element array with a zero somewhere
+		var pos = [Math.random() * DIM, b = Math.random() * DIM];
+		var zeroIndex = Math.floor(Math.random(DIM));
+		pos.splice(zeroIndex, 0, Math.random() < 0.5 ? DIM-1 : 0);
+		
+		var position = new Vec3(pos[0], pos[1], pos[2]);
+		var velocity = new Vec3(pos[0], pos[1], pos[2]);
+		var c = (DIM - 1) / 2;
+		var velocity = new Vec3(c, c, c);
+		velocity.sub(position);
+		velocity.normalise();
+		var speed = 1.0 - vel / 127.0;
+		velocity.mult(new Vec3(speed, speed, speed));
+	//	post();
+	//	post(velocity.data[0], velocity.data[1], velocity.data[2]);
+		return new Particle(position, velocity, [1,1,1]);
+	}
+		
+	
+	this.go = function(pitch, velocity, r, g, b) {	
+		if (velocity > 1) {
+			particles[pitch] = createRandomParticle(pitch, velocity);
+			particles[pitch].col = [r, g, b];
+		}
+		else {
+			// delete particles[pitch];
+		}
+		
+		post(pitch, velocity);
+		post();
+	};
+	
+//	this.addParticle = function(
+	
+	function removeDead() {
+		var margin = 4;
+		var toErase = [];
+		for (var key in particles) {
+			var particle = particles[key];
+			var erase = false;
+			for (var d = 0; d < DIM; d++) {
+				var p = particle.pos.data[d];
+				if (p < -margin || p >= DIM + margin) {
+					toErase.push(key);
+					break;
+				}
+			}	
+		}
+		
+		toErase.forEach(function(index) {
+			delete particles[index];
+		});
+	}
+}
+
+
 function MIDI() {
 
 	extend(this, new FrameBuffer());
 
 	this.modeNames = ["dots", "zline", "yline", "travel"];
 	this.mode = this.modeNames[2];
-	var that = this;
 	
 	var travelIndices = Array.apply(null, Array(DIM2)).map(function(e) { return DIM; });
 	this.colour = [1, 1, 1];
-	
-	this.callback = function(x, y, z) {	
-		return this.buffer[x * DIM2 + y * DIM + z];
-	};
 	
 	this.receive = function(note, velocity) {
 
@@ -402,7 +538,7 @@ function MIDI() {
 					z = x * DIM2 + y * DIM;
 					
 					for (var nz = z + 3; nz > z; nz--) {
-						this.buffer[nz] = that.buffer[nz-1];
+						this.buffer[nz] = this.buffer[nz-1];
 					}
 					this.buffer[z] = color(0);
 
@@ -474,7 +610,14 @@ function mexican(pitch, velocity, r, g, b) {
 	}
 }
 
+function particles(pitch, velocity, r, g, b) {
+	_interactiveGo(messagename, pitch, velocity, r, g, b);
+}
+
 function clear() {
-	
+	for (var key in interactives) {
+		interactive = interactives[key];
+		interactive.clear.call(interactive);
+	}
 }
 
