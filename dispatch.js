@@ -15,7 +15,7 @@ function _sendArgToAll(arg) {
 	_sendFuncToAll(function(x, y, z) { return arg; });	
 }
 
-function _sendFuncToAll(callback) {
+function _sendFuncToAll(callback, object) {
 	var x, y, z, ay, col;
 	var colours = [];
 	for (z = 0; z < DIM; z++) {
@@ -27,7 +27,7 @@ function _sendFuncToAll(callback) {
 				else ay = 3 - y;
 				
 				outlet(1, "send", x + "-" + ay + "-" + z);
-				col = callback(x, ay, z)
+				col = callback.call(object, x, ay, z)
 				outlet(0, col);
 				
 				colours.push.apply(colours, col.slice(1, 4));
@@ -95,34 +95,24 @@ var currentModeName = "black";
 
 function bang() {
 	
-			
-	
-	
 	mainFrameBuffer.reset();
 	
 	if (currentModeName !== null && modes[currentModeName] !== undefined) {
 		var mode = modes[currentModeName];
-		mainFrameBuffer.add(modes[currentModeName].buffer);
-		mode.frameCallback(gFrameCount);
+		mainFrameBuffer.add.call(mainFrameBuffer, modes[currentModeName].buffer);
+		mode.frameCallback.call(mode, gFrameCount);
 	}
 	
-		
-//	_sendFuncToAll(mode.callback);	
-
 	var start = (new Date()).getTime();
 	
 	
 	for (var key in interactives) {
 		interactive = interactives[key];
 		interactive.frameCallback.call(interactive, gFrameCount);
-		mainFrameBuffer.add(interactives[key].buffer);
+		mainFrameBuffer.add.call(mainFrameBuffer, interactives[key].buffer);
 	}
 
-	_sendFuncToAll(mainFrameBuffer.callback);
-
-//	post((new Date()).getTime() - start);
-//	post();
-	
+	_sendFuncToAll(mainFrameBuffer.callback, mainFrameBuffer);
 	
 	gFrameCount++;
 }
@@ -147,7 +137,6 @@ function color() {
 
 function FrameBuffer() {
 	this.buffer = [];
-	var that = this;
 	
 	for (var i = 0; i < TOTAL_LIGHTS; i++) {
 		this.buffer.push(["gl_color", 0, 0, 0]);
@@ -156,7 +145,7 @@ function FrameBuffer() {
 	this.reset = function() {
 		for (var i = 0; i < TOTAL_LIGHTS; i++) {
 			for (var j = 1; j < 4; j++) {
-				that.buffer[i][j] = 0;
+				this.buffer[i][j] = 0;
 			}
 		}
 	};
@@ -166,13 +155,13 @@ function FrameBuffer() {
 	this.add = function(otherBuffer) {
 		for (var i = 0; i < TOTAL_LIGHTS; i++) {
 			for (var j = 1; j < 4; j++) {
-				that.buffer[i][j] = Math.min(1.0, Math.max(that.buffer[i][j], otherBuffer[i][j]));
+				this.buffer[i][j] = Math.min(1.0, Math.max(this.buffer[i][j], otherBuffer[i][j]));
 			}
 		}
 	};
 	
 	this.callback = function(x, y, z) {	
-		return that.buffer[x * DIM2 + y * DIM + z];
+		return this.buffer[x * DIM2 + y * DIM + z];
 	};
 	
 	this.frameCallback = function(frameNum) {};
@@ -193,14 +182,7 @@ function Black() {
 function ColourWheel() {
 	
 	extend(this, new FrameBuffer());
-	var that = this;
 	var theta = 0;
-	
-//	this.callback = (function(x, y, z) {
-//		return ["gl_color", Math.sin(theta + x)*0.5+0.5, Math.cos(theta*0.3+z)*0.5+0.5, Math.sin(theta*0.1)*0.5+0.5];
-//	});
-
-	
 	
 	this.frameCallback = function(frameCount) {
 		
@@ -208,7 +190,7 @@ function ColourWheel() {
 		for (var i = 0; i < TOTAL_LIGHTS; i++) {
 			z = i % 4;
 			x = i / DIM2;
-			that.buffer[i] = color(Math.sin(theta + x)*0.5+0.5, Math.cos(theta*0.3+z)*0.5+0.5, Math.sin(theta*0.1)*0.5+0.5, 0.5);
+			this.buffer[i] = color(Math.sin(theta + x)*0.5+0.5, Math.cos(theta*0.3+z)*0.5+0.5, Math.sin(theta*0.1)*0.5+0.5, 0.5);
 		}
 		
 		theta = frameCount * 0.3;
@@ -220,7 +202,6 @@ function ColourWheel() {
 function Breathe() {
 	
 	extend(this, new FrameBuffer());
-	var that = this;
 	var delta = 0.01;
 	
 	var colours = [
@@ -255,7 +236,6 @@ function Breathe() {
 function Wave() {
 	
 	extend(this, new FrameBuffer);
-	var that = this;
 	
 	var play = false;
 //	var counter = 0;
@@ -264,8 +244,8 @@ function Wave() {
 	
 	this.frameCallback = function(frameNum) {
 
-		for (var i = 0, l = that.buffer.length; i < l; i++) {
-			that.buffer[i][1] = 0; that.buffer[i][2] = 0; that.buffer[i][3] = 0;
+		for (var i = 0, l = this.buffer.length; i < l; i++) {
+			this.buffer[i][1] = 0; this.buffer[i][2] = 0; this.buffer[i][3] = 0;
 		}
 		
 		var todelete = [];
@@ -282,7 +262,7 @@ function Wave() {
 		for (var counterId in counters) {
 			
 			var counter = counters[counterId];
-			for (var i = 0, l = that.buffer.length; i < l; i++) {
+			for (var i = 0, l = this.buffer.length; i < l; i++) {
 				y = Math.floor(i / 4) % 4;
 			
 				if (counter <= 1) {
@@ -293,12 +273,12 @@ function Wave() {
 	
 					var newcol = color(colour[0] * brightness, colour[1] * brightness, colour[2] * brightness); //y == q ? 1 : 0);
 					for (var j = 1; j < 4; j++) {
-						that.buffer[i][j] += Math.min(newcol[j], 1);
+						this.buffer[i][j] += Math.min(newcol[j], 1);
 					}
 				}
 
 				for (var j = 1; j < 4; j++) {
-					that.buffer[i][j] = Math.max(0, that.buffer[i][j] - 0.1);
+					this.buffer[i][j] = Math.max(0, this.buffer[i][j] - 0.1);
 				}
 			}
 		
@@ -383,7 +363,7 @@ function MIDI() {
 	this.colour = [1, 1, 1];
 	
 	this.callback = function(x, y, z) {	
-		return that.buffer[x * DIM2 + y * DIM + z];
+		return this.buffer[x * DIM2 + y * DIM + z];
 	};
 	
 	this.receive = function(note, velocity) {
@@ -392,24 +372,24 @@ function MIDI() {
 
 		if (this.mode === "dots") {
 			// treat note as index and velocity as brightness
-			that.buffer[note % TOTAL_LIGHTS] = col;
+			this.buffer[note % TOTAL_LIGHTS] = col;
 		}
 		else if (this.mode === "zline") {
 			var n = note % DIM2 * DIM;
 			for (var z = 0; z < DIM; z++) {
-				that.buffer[n + z] = col;
+				this.buffer[n + z] = col;
 			}
 		}
 		else if (this.mode === "yline") {
 			var n = note % DIM2;
 			n = n % 4 + Math.floor(n/4)*16;
 			for (var y = 0; y < DIM; y++) {
-				that.buffer[n + y*4] = col;
+				this.buffer[n + y*4] = col;
 			}
 		}
 		else if (this.mode === "travel") {
 			var n = note % DIM2 * DIM;
-			that.buffer[n] = col;
+			this.buffer[n] = col;
 		}
 	};
 	
@@ -422,9 +402,9 @@ function MIDI() {
 					z = x * DIM2 + y * DIM;
 					
 					for (var nz = z + 3; nz > z; nz--) {
-						that.buffer[nz] = that.buffer[nz-1];
+						this.buffer[nz] = that.buffer[nz-1];
 					}
-					that.buffer[z] = color(0);
+					this.buffer[z] = color(0);
 
 				}
 			}
@@ -492,5 +472,9 @@ function mexican(pitch, velocity, r, g, b) {
 	if (velocity > 0) {
 		_interactiveGo(messagename, pitch, velocity, r, g, b);
 	}
+}
+
+function clear() {
+	
 }
 
