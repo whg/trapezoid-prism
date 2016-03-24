@@ -1,5 +1,5 @@
 
-outlets = 3;
+outlets = 4;
 var DIM = 4;
 
 var DIM2 = DIM * DIM;
@@ -114,6 +114,9 @@ function bang() {
 	}
 
 	_sendFuncToAll(mainFrameBuffer.callback, mainFrameBuffer);
+	
+//	post((new Date()).getTime() - start);
+//	post();	
 	
 	gFrameCount++;
 }
@@ -407,27 +410,27 @@ function Particles() {
 	extend(this, new FrameBuffer());
 	
 	var particles = { };//90: new Particle(new Vec3(1, 1, 1), new Vec3(0, 0.1, 0), [1,1,1]) };
-	
+
 	this.frameCallback = function(frameNum) {
 		this.clear();
+		drawing = true;
 		for (var key in particles) {
 			var particle = particles[key];
 			var x, y, z;
 			for (var n = 0; n < TOTAL_LIGHTS; n++) {
 				x = Math.floor(n / DIM2), y = Math.floor(n / DIM % 4), z = n % DIM;
-				var brightness = 1.0 - particle.pos.dist(new Vec3(x, y, z)) * 0.3;
-				var newcol = color(brightness * particle.col[0], brightness * particle.col[1], brightness * particle.col[2]);
+				var brightness = Math.max(0, 1.0 - particle.pos.dist(new Vec3(x, y, z)) * 0.3);
+				if (brightness < 0.01) continue;
+//				var newcol = color(brightness * particle.col[0], brightness * particle.col[1], brightness * particle.col[2]);
 				for (var c = 0; c < 3; c++) {
 					this.buffer[n][c+1] = Math.min(1.0, this.buffer[n][c+1] + brightness * particle.col[c]);
 				}
+//				this.buffer[n] = newcol;
 			}
-			
-			
 			particle.update();
 			
 		}
-		post(Object.keys(particles).length);
-		post();
+		
 
 		if (frameNum % 5 == 0) {
 			removeDead();
@@ -442,21 +445,18 @@ function Particles() {
 		pos.splice(zeroIndex, 0, Math.random() < 0.5 ? DIM-1 : 0);
 		
 		var position = new Vec3(pos[0], pos[1], pos[2]);
-		var velocity = new Vec3(pos[0], pos[1], pos[2]);
 		var c = (DIM - 1) / 2;
 		var velocity = new Vec3(c, c, c);
 		velocity.sub(position);
 		velocity.normalise();
 		var speed = 1.0 - vel / 127.0;
 		velocity.mult(new Vec3(speed, speed, speed));
-	//	post();
-	//	post(velocity.data[0], velocity.data[1], velocity.data[2]);
-		return new Particle(position, velocity, [1,1,1]);
+		return new Particle(position, velocity);
 	}
 		
 	
 	this.go = function(pitch, velocity, r, g, b) {	
-		if (velocity > 1) {
+		if (velocity > 1) {			
 			particles[pitch] = createRandomParticle(pitch, velocity);
 			particles[pitch].col = [r, g, b];
 		}
@@ -464,14 +464,10 @@ function Particles() {
 			// delete particles[pitch];
 		}
 		
-		post(pitch, velocity);
-		post();
 	};
-	
-//	this.addParticle = function(
-	
+		
 	function removeDead() {
-		var margin = 4;
+		var margin = 6;
 		var toErase = [];
 		for (var key in particles) {
 			var particle = particles[key];
