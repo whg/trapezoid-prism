@@ -82,6 +82,7 @@ var modes = {
 //	"wave": new Wave(),
 	"colourWheel": new ColourWheel(),
 //	"midi": new MIDI(),
+
 };
 
 var interactives = {
@@ -89,6 +90,7 @@ var interactives = {
 	"midi": new MIDI(),
 	"mexican": new Mexican(),
 	"particles": new Particles(),
+	"audio" : new Audio(),
 };
 
 var mainFrameBuffer = new FrameBuffer();
@@ -560,6 +562,32 @@ function MIDI() {
 	
 };
 
+function Audio() {
+	extend(this, new FrameBuffer());
+	
+	this.update = function(val) {
+		val *= DIM;
+		var floor = Math.floor(val)
+		var fraction = val - floor;
+		for (var i = 0; i < TOTAL_LIGHTS; i++) {
+			var y = Math.floor(i / DIM) % 4;
+			if (y < floor) {
+				this.buffer[i] = color(1);
+			}
+			else if (y < val) {
+				this.buffer[i] = color(val - floor);
+			}
+			else {
+				this.buffer[i] = color(0);
+			}
+			//this.buffer[i] = color(1);
+		}
+		//this.buffer[0] = color(1);
+		post(val, floor, fraction);
+		post();
+	};
+}
+
 function note(pitch, velocity) {
 	interactives["midi"].receive(pitch, velocity);
 }
@@ -621,6 +649,10 @@ function mexican(pitch, velocity, r, g, b) {
 
 function particles(pitch, velocity, r, g, b, q) {
 	_interactiveGo(messagename, pitch, velocity, r, g, b, q);
+}
+
+function up(value) {
+	interactives["audio"].update.call(interactives["audio"], value);
 }
 
 function clear() {
