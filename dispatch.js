@@ -1,5 +1,5 @@
 
-outlets = 4;
+outlets = 3;
 var DIM = 4;
 
 var DIM2 = DIM * DIM;
@@ -10,6 +10,7 @@ function tripletIndex(x, y, z) {
 }
 
 var gFrameCount = 0;
+var gVelocityIsBrightness = false;
 
 function _sendArgToAll(arg) {
 	_sendFuncToAll(function(x, y, z) { return arg; });	
@@ -396,10 +397,11 @@ function Vec3(x, y, z) {
 	};
 };
 
-function Particle(pos, vel, col) {
+function Particle(pos, vel, col, spread) {
 	this.pos = pos;
 	this.vel = vel;
 	this.col = col;
+	this.spread = spread || 0.2;
 	
 	this.update = function() {
 		this.pos.add.call(this.pos, this.vel);
@@ -419,7 +421,7 @@ function Particles() {
 			var x, y, z;
 			for (var n = 0; n < TOTAL_LIGHTS; n++) {
 				x = Math.floor(n / DIM2), y = Math.floor(n / DIM % 4), z = n % DIM;
-				var brightness = Math.max(0, 1.0 - particle.pos.dist(new Vec3(x, y, z)) * 0.3);
+				var brightness = Math.max(0, 1.0 - particle.pos.dist(new Vec3(x, y, z)) * particle.spread);
 				if (brightness < 0.01) continue;
 //				var newcol = color(brightness * particle.col[0], brightness * particle.col[1], brightness * particle.col[2]);
 				for (var c = 0; c < 3; c++) {
@@ -455,10 +457,11 @@ function Particles() {
 	}
 		
 	
-	this.go = function(pitch, velocity, r, g, b) {	
+	this.go = function(pitch, velocity, r, g, b, q) {	
 		if (velocity > 1) {			
 			particles[pitch] = createRandomParticle(pitch, velocity);
 			particles[pitch].col = [r, g, b];
+			particles[pitch].spread = q;
 		}
 		else {
 			// delete particles[pitch];
@@ -494,13 +497,20 @@ function MIDI() {
 
 	this.modeNames = ["dots", "zline", "yline", "travel"];
 	this.mode = this.modeNames[2];
+	this.q = 1;
 	
 	var travelIndices = Array.apply(null, Array(DIM2)).map(function(e) { return DIM; });
 	this.colour = [1, 1, 1];
 	
 	this.receive = function(note, velocity) {
 
-		var col = color.apply(null, this.colour.concat(velocity / 127.0));
+		var col;
+ 		if (gVelocityIsBrightness) {
+			col = color.apply(null, this.colour.concat(velocity / 127.0));
+		}
+		else {
+			col = color.apply(null, this.colour.concat(velocity == 0 ? 0 : 1));
+		}
 
 		if (this.mode === "dots") {
 			// treat note as index and velocity as brightness
@@ -527,7 +537,7 @@ function MIDI() {
 	
 	this.frameCallback = function(frameNum) {
 		
-		if (this.mode == "travel" && frameNum % 2 == 0) {
+		if (this.mode == "travel" && frameNum % Math.floor(this.q*6+1) == 0) {
 			var z;
 			for (var x = 0; x < DIM; x++) {
 				for (var y = 0; y < DIM; y++) {
@@ -547,23 +557,26 @@ function MIDI() {
 	this.setColour = function(r, g, b) {
 		this.colour = [r, g, b];
 	};
+	
 };
 
 function note(pitch, velocity) {
 	interactives["midi"].receive(pitch, velocity);
 }
 
-function _midi(_name, pitch, velocity, r, g, b) {
-	interactives["midi"].mode = _name;
-	interactives["midi"].setColour.call(interactives["midi"], r, g, b);
-	interactives["midi"].receive(pitch, velocity);
+function _midi(_name, pitch, velocity, r, g, b, q) {
+	var midi = interactives["midi"];
+	midi.mode = _name;
+	midi.setColour.call(midi, r, g, b);
+	midi.receive(pitch, velocity);
+	midi.q = q;
 }
 
 
 function zline(pitch, vel, r, g, b) { _midi(messagename, pitch, vel, r, g, b); }
 function yline(pitch, vel, r, g, b) { _midi(messagename, pitch, vel, r, g, b); }
 function dots(pitch, vel, r, g, b) { _midi(messagename, pitch, vel, r, g, b); }
-function travel(pitch, vel, r, g, b) { _midi(messagename, pitch, vel, r, g, b); }
+function travel(pitch, vel, r, g, b, q) { _midi(messagename, pitch, vel, r, g, b, q); }
 
 
 
@@ -596,8 +609,8 @@ function black() {
 	currentModeName = messagename;
 }
 
-function _interactiveGo(n, pitch, velocity, r, g, b) {
-	interactives[n].go.call(interactives[n], pitch, velocity, r, g, b);
+function _interactiveGo(n, pitch, velocity, r, g, b, q) {
+	interactives[n].go.call(interactives[n], pitch, velocity, r, g, b, q);
 };
 
 function mexican(pitch, velocity, r, g, b) {
@@ -606,8 +619,8 @@ function mexican(pitch, velocity, r, g, b) {
 	}
 }
 
-function particles(pitch, velocity, r, g, b) {
-	_interactiveGo(messagename, pitch, velocity, r, g, b);
+function particles(pitch, velocity, r, g, b, q) {
+	_interactiveGo(messagename, pitch, velocity, r, g, b, q);
 }
 
 function clear() {
@@ -617,3 +630,6 @@ function clear() {
 	}
 }
 
+function velisbright(v) {
+	gVelocityIsBrightness = v != 0;
+}
