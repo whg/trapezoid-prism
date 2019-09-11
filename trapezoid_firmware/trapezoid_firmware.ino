@@ -9,7 +9,7 @@
 
 CRGB leds[NUM_LEDS];
 
-#define DEBUG 1
+//#define DEBUG 1
 #define START 1
 #define END 2
 #define OVERRUN 11
