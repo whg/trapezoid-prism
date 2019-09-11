@@ -56,8 +56,9 @@ class Receiver {
           }
 
           // reset position if we've overrun
-          if (dataPosition >= MESSAGE_LENGTH && mode != ENDED) {
+          if (dataPosition > MESSAGE_LENGTH && mode != ENDED) {
             dataPosition = 0;
+			mode = WAITING;
             #ifdef DEBUG
             Serial.write(OVERRUN);
             Serial.write(endIndex);
@@ -70,21 +71,6 @@ class Receiver {
           }
           else if (mode == ENDED) {
            
-            // // make sure the checksum is correct
-            // uint16_t sum = 0;
-            // for (int i = 0; i < DATA_LENGTH; i++) {
-            //   sum += data[i];
-            // }
-            // uint8_t checksum = sum % 255;
-
-			// Serial.write(int(CHECKSUM_INDEX));
-            // if (data[CHECKSUM_INDEX] != checksum) {
-            //   #ifdef DEBUG
-            //   Serial.write(CHECKSUMFAIL);
-            //   #endif
-            //   continue;
-            // }
-
             uint8_t *ledsPointer = reinterpret_cast<uint8_t*>(&leds[0]);
             for (int i = 0; i < DATA_LENGTH; i++) {
               ledsPointer[i] = data[i];

@@ -216,6 +216,8 @@ function Breathe() {
 		[0, 1, 0],
 		[0, 0, 1],
 		[1, 0, 1],
+		[0, 0.5, 1],
+		[0.6, 0.4, 1],
 	];
 	var colourCounter = 0;
 	var canChange = true;
@@ -288,7 +290,7 @@ function Wave() {
 				}
 			}
 		
-			counters[counterId]+= 0.1;
+			counters[counterId]+= 0.05;
 		}
 		
 	};
@@ -453,7 +455,7 @@ function Particles() {
 		var velocity = new Vec3(c, c, c);
 		velocity.sub(position);
 		velocity.normalise();
-		var speed = 1.0 - vel / 127.0;
+		var speed = vel / 128.0;
 		velocity.mult(new Vec3(speed, speed, speed));
 		return new Particle(position, velocity);
 	}
@@ -500,7 +502,8 @@ function MIDI() {
 	this.modeNames = ["dots", "zline", "yline", "travel"];
 	this.mode = this.modeNames[2];
 	this.q = 1;
-	
+	var sentOut = 0;
+
 	var travelIndices = Array.apply(null, Array(DIM2)).map(function(e) { return DIM; });
 	this.colour = [1, 1, 1];
 	
@@ -535,6 +538,7 @@ function MIDI() {
 			var n = note % DIM2 * DIM;
 			this.buffer[n] = col;
 		}
+		sentOut = 0;
 	};
 	
 	this.frameCallback = function(frameNum) {
@@ -554,7 +558,9 @@ function MIDI() {
 			}
 
 		}
+		sentOut++;
 	};
+	
 	
 	this.setColour = function(r, g, b) {
 		this.colour = [r, g, b];
@@ -564,27 +570,32 @@ function MIDI() {
 
 function Audio() {
 	extend(this, new FrameBuffer());
+	var modes = ["up", "whole"];
+	this.mode = modes[0];
 	
 	this.update = function(val) {
-		val *= DIM;
-		var floor = Math.floor(val)
-		var fraction = val - floor;
-		for (var i = 0; i < TOTAL_LIGHTS; i++) {
-			var y = Math.floor(i / DIM) % 4;
-			if (y < floor) {
-				this.buffer[i] = color(1);
+		if (this.mode == "up") {
+			val *= DIM;
+			var floor = Math.floor(val)
+			var fraction = val - floor;
+			for (var i = 0; i < TOTAL_LIGHTS; i++) {
+				var y = Math.floor(i / DIM) % 4;
+				if (y < floor) {
+					this.buffer[i] = color(1);
+				}
+				else if (y < val) {
+					this.buffer[i] = color(val - floor);
+				}
+				else {
+					this.buffer[i] = color(0);
+				}
 			}
-			else if (y < val) {
-				this.buffer[i] = color(val - floor);
-			}
-			else {
-				this.buffer[i] = color(0);
-			}
-			//this.buffer[i] = color(1);
 		}
-		//this.buffer[0] = color(1);
-		post(val, floor, fraction);
-		post();
+		else if (this.mode == "whole") {
+			for (var i = 0; i < TOTAL_LIGHTS; i++) {
+			  	this.buffer[i] = color(val);
+			}
+		}
 	};
 }
 
@@ -594,6 +605,7 @@ function note(pitch, velocity) {
 
 function _midi(_name, pitch, velocity, r, g, b, q) {
 	var midi = interactives["midi"];
+//	midi.clear();
 	midi.mode = _name;
 	midi.setColour.call(midi, r, g, b);
 	midi.receive(pitch, velocity);
@@ -652,8 +664,17 @@ function particles(pitch, velocity, r, g, b, q) {
 }
 
 function up(value) {
-	interactives["audio"].update.call(interactives["audio"], value);
+	var audio = interactives["audio"];
+	audio.mode = messagename;
+	audio.update.call(audio, value);
 }
+
+function whole(value) {
+	var audio = interactives["audio"];
+	audio.mode = messagename;
+	audio.update.call(audio, value);
+}
+
 
 function clear() {
 	for (var key in interactives) {
